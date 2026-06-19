@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "default_agent": "pdf-orchestrator",
+  "mcp": {
+    "mcp-aem-hiberus": {
+      "type": "local",
+      "enabled": true,
+      "command": [
+        "node",
+        "/home/korodjouma/AEM/aem-ia-template/mcp-aem-hiberus/build/index.js"
+      ],
+      "environment": {
+        "AEM_URL": "http://localhost:4502",
+        "AEM_USER": "admin",
+        "AEM_PASSWORD": "admin"
+      }
+    }
+  }
+}
