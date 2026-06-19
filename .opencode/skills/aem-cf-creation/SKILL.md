@@ -28,7 +28,7 @@ Los Content Fragments (CF) son fragmentos de contenido estructurado. Viven en `/
 
 ### Paso 1: Verificar/Crear el Modelo CF
 
-El modelo define los campos del fragmento. **Solo crea el modelo si el JSON incluye `aem.model_fields`** (array no vacío). Si `model_fields` no está en el JSON, el modelo ya existe en AEM → salta al Paso 2.
+El modelo define los campos del fragmento. **Solo crea el modelo si el JSON incluye `model_fields`** (array no vacío). Si no está, el modelo ya existe en AEM → salta al Paso 2.
 
 #### GOTCHA CRÍTICO — Campos duplicados
 
@@ -38,7 +38,7 @@ El modelo define los campos del fragmento. **Solo crea el modelo si el JSON incl
 
 ```
 getNodeContent(
-  path: "{aem.model_path}/jcr:content/model/cq:dialog/content/items",
+  path: "{model_path}/jcr:content/model/cq:dialog/content/items",
   depth: 2
 )
 ```
@@ -54,11 +54,9 @@ Interpreta el resultado:
 ```
 manageContentFragmentModel(
   action: "create",
-  configPath: "{parte del model_path antes de /settings}",
-                ← ej: "/conf/global" para "/conf/global/settings/dam/cfm/models/termino-financiero"
-  modelName: "{última parte del model_path}",
-                ← ej: "termino-financiero"
-  title: "{aem.model_title}",
+  configPath: conf_root,       ← ej: "/conf/global"
+  modelName: content_type,     ← ej: "diccionario-economia"
+  title: model_title,
   fields: [
     { name: "campo1", label: "Campo 1", type: "text-single", required: true },
     { name: "campo2", label: "Campo 2", type: "text-multi",  required: false }
@@ -76,7 +74,7 @@ Tras `create`, vuelve a llamar `getNodeContent` en `.../items`. Cuenta los nodos
 **d) Si hay campos duplicados — borrar y recrear:**
 
 ```
-manageContentFragmentModel(action: "delete", modelPath: "{aem.model_path}")
+manageContentFragmentModel(action: "delete", modelPath: "{model_path}")
 ```
 
 Luego vuelve al paso (b) para crear desde cero.
@@ -86,10 +84,10 @@ Luego vuelve al paso (b) para crear desde cero.
 #### 2a — Crear las carpetas (mkdir -p automático)
 
 ```
-createDamFolder(folderPath: "{aem.parent_path}")
+createDamFolder(folderPath: parent_path)
 ```
 
-`createDamFolder` crea toda la jerarquía de una vez: si `parent_path` es `/content/dam/bankinter.com/diccionario-economia`, crea tanto `/content/dam/bankinter.com` como el subpath completo. Carpetas ya existentes no dan error.
+`createDamFolder` crea toda la jerarquía de una vez. Carpetas ya existentes no dan error.
 
 #### 2b — Configurar "Allowed Content Fragment Models" en la raíz del dominio
 
@@ -97,16 +95,11 @@ Esta política es **obligatoria**: sin ella, AEM no permite crear CFs en la carp
 
 Se aplica en la carpeta raíz del dominio (no en la subcarpeta), y **todas las subcarpetas heredan** automáticamente.
 
-Deriva las rutas necesarias:
-
-- `domain_root`: primeros 3 segmentos del path → `/content/dam/{domain}` (ej: `/content/dam/bankinter.com`)
-- `configPath`: parte del `model_path` antes de `/settings` → ej: `/conf/global`
-
 ```
 setDamFolderCfPolicy(
-  folderPath: "{domain_root}",          ← /content/dam/{domain}
-  allowedByPath: ["{configPath}"],      ← ["/conf/global"]
-  mode: "merge"                         ← no sobreescribe políticas existentes
+  folderPath: domain_root,         ← /content/dam/{domain}
+  allowedByPath: [conf_root],      ← ["/conf/global"]
+  mode: "merge"                    ← no sobreescribe políticas existentes
 )
 ```
 
@@ -119,11 +112,11 @@ setDamFolderCfPolicy(
 ```
 manageContentFragment(
   action: "create",
-  parentPath: "{aem.parent_path}",
-  model: "{aem.model_path}",
-  title: "{aem.cf_title}",
-  name: "{aem.cf_name}",           ← opcional: si no se pasa, AEM genera el name del título
-  description: "{aem.cf_description}",  ← opcional
+  parentPath: parent_path,
+  model: model_path,
+  title: cf_title,
+  name: cf_name,              ← opcional: si no se pasa, AEM genera el name del título
+  description: cf_description,  ← opcional
   fields: {
     "campo1": "valor1",
     "campo2": "valor2"
@@ -146,12 +139,43 @@ Usa en cambio:
 
 ```
 getNodeContent(
-  path: "{aem.parent_path}/{aem.cf_name}",
+  path: "{parent_path}/{cf_name}",
   depth: 1
 )
 ```
 
 Si el nodo existe → CF creado correctamente.
+
+---
+
+## Contrato JSON de entrada
+
+El JSON que llega al contribuidor (producido por `cf-scraper`) tiene esta estructura plana. **No incluye rutas AEM** — esas las deriva el contribuidor.
+
+```json
+{
+  "source_url":    "https://...",
+  "domain":        "bankinter.com",
+  "page_slug":     "blog-diccionario-economia-preferente",
+  "scraped_at":    "2026-01-01T00:00:00Z",
+  "content_type":  "diccionario-economia",
+  "cf_title":      "Preferente",
+  "cf_name":       "preferente",
+  "cf_description":"Importado autom\u00e1ticamente desde https://...",
+  "model_title":   "Diccionario Econom\u00eda",
+  "model_fields":  [ { "name": "titulo", "label": "T\u00edtulo", "type": "text-single", "required": true }, ... ],
+  "fields":        { "titulo": "Preferente", "contenido": "..." }
+}
+```
+
+El contribuidor deriva las rutas AEM usando `content_type` y `domain`:
+
+| Variable      | Valor derivado                                       |
+| ------------- | ---------------------------------------------------- |
+| `conf_root`   | `/conf/global` (convención del proyecto)             |
+| `model_path`  | `{conf_root}/settings/dam/cfm/models/{content_type}` |
+| `parent_path` | `/content/dam/{domain}/{content_type}`               |
+| `domain_root` | `/content/dam/{domain}`                              |
 
 ---
 

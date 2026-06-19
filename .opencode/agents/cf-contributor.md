@@ -60,22 +60,40 @@ El JSON debe tener esta estructura. El agente scraper es responsable de producir
 }
 ```
 
-Campos obligatorios: `aem.model_path`, `aem.parent_path`, `aem.cf_title`, `fields`.
-Campos opcionales: `aem.model_title`, `aem.model_fields`, `aem.cf_name`, `aem.cf_description`.
+Campos obligatorios: `domain`, `content_type`, `cf_title`, `fields`.
+Campos opcionales: `cf_name`, `cf_description`, `model_title`, `model_fields`.
 
 ## Proceso
 
-### 1. Leer y validar el JSON
+### 0. Leer el JSON y derivar las rutas AEM
 
-Lee el fichero en `json_path` y verifica que existen: `aem.model_path`, `aem.parent_path`, `aem.cf_title`, `fields`.
+Lee el fichero en `json_path`. Verifica que existen: `domain`, `content_type`, `cf_title`, `fields`.
 
-Si falta algún campo obligatorio → ACK `FAIL | failure_class:INVALID_JSON`
+Si falta alguno → ACK `FAIL | failure_class:INVALID_JSON`
 
-Extrae todos los valores del JSON para usar en los pasos siguientes.
+**Deriva las rutas AEM** a partir de los campos semánticos del JSON:
 
-### 2. Crear el Content Fragment Model (si se proporcionan model_fields)
+```
+conf_root   = "/conf/global"   ← convención del proyecto
+model_path  = "{conf_root}/settings/dam/cfm/models/{content_type}"
+parent_path = "/content/dam/{domain}/{content_type}"
+domain_root = "/content/dam/{domain}"
+```
 
-Si el JSON incluye `aem.model_fields` (array no vacío), intenta crear el modelo.
+Estas convenciones son la fuente de verdad de este proyecto para las rutas AEM. Si el proyecto cambia de conf, se actualiza aquí, no en el scraper.
+
+Extrae además del JSON:
+
+- `cf_title` ← campo `cf_title`
+- `cf_name` ← campo `cf_name` (si existe) o genera del `cf_title` en kebab-case
+- `cf_description` ← campo `cf_description` (si existe)
+- `model_title` ← campo `model_title` (si existe) o humaniza `content_type`
+- `model_fields` ← campo `model_fields` (si existe y no está vacío)
+- `fields` ← campo `fields`
+
+### 1. Verificar y crear el modelo CF
+
+Solo si `model_fields` está presente y no está vacío. Si no existe → el modelo ya existe en AEM, salta al Paso 3.
 
 **COMPORTAMIENTO CONOCIDO DEL MCP**: `manageContentFragmentModel` con `action: "update"` hace APPEND de fields, no replace — nunca uses update sobre un modelo que ya tiene fields. Si el modelo existe con fields duplicados, bórralo y recréalo.
 
@@ -83,11 +101,11 @@ Si el JSON incluye `aem.model_fields` (array no vacío), intenta crear el modelo
 
 Llama a `getNodeContent` con:
 
-- `path`: `{aem.model_path}/jcr:content/model/cq:dialog/content/items`
+- `path`: `{model_path}/jcr:content/model/cq:dialog/content/items`
 - `depth`: 2
 
-- Si el nodo existe Y tiene el mismo número de hijos que `aem.model_fields` → modelo OK, salta al paso 3.
-- Si el nodo existe con fields duplicados (hijos = múltiplo de `aem.model_fields.length`) → llama `manageContentFragmentModel` con `action: "delete"`, luego recrea.
+- Si el nodo existe Y tiene el mismo número de hijos que `model_fields` → modelo OK, salta al Paso 3.
+- Si el nodo existe con fields duplicados (hijos = múltiplo de `model_fields.length`) → llama `manageContentFragmentModel` con `action: "delete"`, luego recrea.
 - Si el nodo no existe o `items` está vacío → procede a crear.
 
 **b) Crear el modelo:**
@@ -95,49 +113,36 @@ Llama a `getNodeContent` con:
 Llama a `manageContentFragmentModel` con:
 
 - `action`: `"create"`
-- `configPath`: parte del `aem.model_path` hasta antes de `/settings` (ej: `/conf/global`)
-- `modelName`: última parte del `aem.model_path` (ej: `termino-financiero`)
-- `title`: `aem.model_title` (si existe) o el `modelName`
-- `fields`: el array `aem.model_fields` tal cual viene en el JSON
+- `configPath`: `conf_root` (ej: `/conf/global`)
+- `modelName`: `content_type` (ej: `diccionario-economia`)
+- `title`: `model_title`
+- `fields`: el array `model_fields`
 
 **c) Verificar que los fields se escribieron:**
 
-Tras el create, llama de nuevo a `getNodeContent` en `.../items` y cuenta los nodos hijo. Si el count no coincide con `aem.model_fields.length` → ACK `FAIL | failure_class:AEM_DOWN` (el MCP no escribió los fields).
+Tras el create, llama de nuevo a `getNodeContent` en `.../items` y cuenta los nodos hijo. Si el count no coincide con `model_fields.length` → ACK `FAIL | failure_class:AEM_DOWN`.
 
 Si el MCP responde con error de conexión → ACK `FAIL | failure_class:AEM_DOWN`
-
-Si el JSON no incluye `aem.model_fields` → salta este paso (el modelo ya existe en AEM).
 
 ### 3. Crear la jerarquía de carpetas DAM y configurar política CF
 
 **a) Crear las carpetas (la ruta completa de una vez):**
 
-Llama a `createDamFolder` con:
+Llama a `createDamFolder` con `folderPath: parent_path`.
 
-- `folderPath`: `aem.parent_path`
-
-`createDamFolder` hace mkdir -p — crea toda la jerarquía incluyendo `/content/dam/{domain}` y `/content/dam/{domain}/{content_type}` en una sola llamada. Si alguna carpeta ya existe, continúa sin fallo.
+`createDamFolder` hace mkdir -p — crea toda la jerarquía incluyendo `domain_root` y `parent_path` en una sola llamada. Si alguna carpeta ya existe, continúa sin fallo.
 
 Si el MCP responde con error de conexión → ACK `FAIL | failure_class:AEM_DOWN`
 
 **b) Configurar "Allowed Content Fragment Models" en la carpeta raíz del dominio:**
 
-Deriva la carpeta raíz del dominio a partir de `aem.parent_path`:
-
-- Separa el path por `/` y toma los 3 primeros segmentos no vacíos: `content`, `dam`, `{domain}`
-- `domain_root` = `/content/dam/{domain}` (ej: `/content/dam/bankinter.com`)
-
-Deriva el `configPath` a partir de `aem.model_path`:
-
-- Toma todo lo que hay antes de `/settings` (ej: `/conf/global`)
-
 Llama a `setDamFolderCfPolicy` con:
 
-- `folderPath`: `{domain_root}` ← raíz del dominio, NO la subcarpeta
-- `allowedByPath`: `["{configPath}"]` ← ej: `["/conf/global"]`
-- `mode`: `"merge"` ← no sobreescribe políticas existentes
+- `folderPath`: `domain_root` ← ej: `/content/dam/bankinter.com`
+- `allowedByPath`: `[conf_root]` ← ej: `["/conf/global"]`
+- `mode`: `"merge"`
 
-Esta política permite todos los modelos CF del conf en la carpeta del dominio y en **todas sus subcarpetas automáticamente por herencia**.
+Esta política se aplica una sola vez en la raíz del dominio; todas las subcarpetas heredan automáticamente.
 
 Si el MCP responde con error de conexión → ACK `FAIL | failure_class:AEM_DOWN`
 
@@ -146,11 +151,11 @@ Si el MCP responde con error de conexión → ACK `FAIL | failure_class:AEM_DOWN
 Llama a `manageContentFragment` con:
 
 - `action`: `"create"`
-- `parentPath`: `aem.parent_path`
-- `model`: `aem.model_path`
-- `title`: `aem.cf_title`
-- `name`: `aem.cf_name` (si existe; si no, omite y AEM lo genera del título)
-- `description`: `aem.cf_description` (si existe)
+- `parentPath`: `parent_path`
+- `model`: `model_path`
+- `title`: `cf_title`
+- `name`: `cf_name` (si existe; si no, omite y AEM lo genera del título)
+- `description`: `cf_description` (si existe)
 - `fields`: el objeto `fields` tal cual viene en el JSON
 
 Si el MCP responde con error de conexión → ACK `FAIL | failure_class:AEM_DOWN`
@@ -164,9 +169,9 @@ Escribe entrada en `context/cf/{domain}/cf-log.md` con la herramienta `edit`:
 ```markdown
 ## {ISO_TIMESTAMP} — {source_url}
 
-- cf_path: {aem.parent_path}/{aem.cf_name}
-- model: {aem.model_path}
-- title: {aem.cf_title}
+- cf_path: {parent_path}/{cf_name}
+- model: {model_path}
+- title: {cf_title}
 - status: CREATED
 ```
 

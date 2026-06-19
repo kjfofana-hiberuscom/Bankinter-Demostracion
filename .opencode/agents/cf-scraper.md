@@ -161,19 +161,21 @@ Partiendo del contenido extraído, define los campos del modelo:
   }
   ```
 
-**c) Construir la sección `aem`**
+**c) Construir los metadatos del modelo y del fragmento**
+
+Estos valores son de _contenido_ — los decide el scraper porque los extrae de la página o de la URL:
 
 ```json
 {
-  "model_path": "/conf/global/settings/dam/cfm/models/{content_type}",
-  "model_title": "{content_type con guiones → espacios, primera letra mayúscula}",
-  "model_fields": [ ... los campos construidos arriba ... ],
-  "parent_path": "/content/dam/{domain}/{content_type}",
-  "cf_name": "{último segmento del path de la URL, sin extensión}",
-  "cf_title": "{título extraído}",
-  "cf_description": "Importado automáticamente desde {URL}"
+  "cf_name":        "{\u00faltimo segmento del path de la URL, sin extensi\u00f3n}",
+  "cf_title":       "{t\u00edtulo extra\u00eddo}",
+  "cf_description": "Importado autom\u00e1ticamente desde {URL}",
+  "model_title":    "{content_type con guiones \u2192 espacios, primera letra may\u00fascula}",
+  "model_fields":   [ ... los campos construidos arriba ... ]
 }
 ```
+
+Las rutas AEM (`model_path`, `parent_path`) **no** las calcula el scraper — las deriva el contribuidor cuando recibe el JSON.
 
 **d) Construir `fields`**
 
@@ -202,15 +204,21 @@ Escribe con la herramienta `edit` en `context/cf/{domain}/{page_slug}.json`:
 
 ```json
 {
-  "source_url": "{URL}",
-  "domain": "{domain}",
-  "page_slug": "{page_slug}",
-  "scraped_at": "{ISO_TIMESTAMP}",
-  "content_type": "{content_type}",
-  "aem": { ... },
-  "fields": { ... }
+  "source_url":    "{URL}",
+  "domain":        "{domain}",
+  "page_slug":     "{page_slug}",
+  "scraped_at":    "{ISO_TIMESTAMP}",
+  "content_type":  "{content_type}",
+  "cf_title":      "{t\u00edtulo extra\u00eddo}",
+  "cf_name":       "{slug del item}",
+  "cf_description":"Importado autom\u00e1ticamente desde {URL}",
+  "model_title":   "{content_type humanizado}",
+  "model_fields":  [ ... ],
+  "fields":        { ... }
 }
 ```
+
+No incluye sección `aem` — las rutas JCR las deriva el contribuidor.
 
 ### 8. Worker Log
 
