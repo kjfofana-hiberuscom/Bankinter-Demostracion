@@ -81,15 +81,38 @@ manageContentFragmentModel(action: "delete", modelPath: "{aem.model_path}")
 
 Luego vuelve al paso (b) para crear desde cero.
 
-### Paso 2: Crear la Carpeta DAM
+### Paso 2: Crear la jerarquía de carpetas DAM y configurar la política CF
+
+#### 2a — Crear las carpetas (mkdir -p automático)
 
 ```
 createDamFolder(folderPath: "{aem.parent_path}")
 ```
 
-Si la carpeta ya existe → AEM devuelve un estado indicando que existe, no es un error → continúa sin fallo.
+`createDamFolder` crea toda la jerarquía de una vez: si `parent_path` es `/content/dam/bankinter.com/diccionario-economia`, crea tanto `/content/dam/bankinter.com` como el subpath completo. Carpetas ya existentes no dan error.
 
-Si AEM no responde → ACK `FAIL | failure_class:AEM_DOWN`.
+#### 2b — Configurar "Allowed Content Fragment Models" en la raíz del dominio
+
+Esta política es **obligatoria**: sin ella, AEM no permite crear CFs en la carpeta aunque el modelo exista.
+
+Se aplica en la carpeta raíz del dominio (no en la subcarpeta), y **todas las subcarpetas heredan** automáticamente.
+
+Deriva las rutas necesarias:
+
+- `domain_root`: primeros 3 segmentos del path → `/content/dam/{domain}` (ej: `/content/dam/bankinter.com`)
+- `configPath`: parte del `model_path` antes de `/settings` → ej: `/conf/global`
+
+```
+setDamFolderCfPolicy(
+  folderPath: "{domain_root}",          ← /content/dam/{domain}
+  allowedByPath: ["{configPath}"],      ← ["/conf/global"]
+  mode: "merge"                         ← no sobreescribe políticas existentes
+)
+```
+
+`mode: "merge"` es seguro: si ya hay una política definida, la completa en lugar de borrarla.
+
+**¿Cuándo necesitas esto?** Siempre que crees una carpeta nueva para un dominio. Las carpetas existentes con política ya configurada no necesitan este paso.
 
 ### Paso 3: Crear el Content Fragment
 
@@ -165,7 +188,8 @@ Si el nodo existe → CF creado correctamente.
 | Verificar si modelo existe/tiene campos | `getNodeContent` en `{model_path}/jcr:content/model/cq:dialog/content/items` |
 | Crear modelo CF                         | `manageContentFragmentModel` `action: "create"`                              |
 | Borrar modelo (antes de recrear)        | `manageContentFragmentModel` `action: "delete"`                              |
-| Crear carpeta DAM                       | `createDamFolder`                                                            |
+| Crear carpeta DAM (mkdir -p)            | `createDamFolder`                                                            |
+| Política CF en carpeta dominio          | `setDamFolderCfPolicy` `allowedByPath` + `mode: "merge"`                     |
 | Crear CF                                | `manageContentFragment` `action: "create"`                                   |
 | Actualizar CF                           | `manageContentFragment` `action: "update"`                                   |
 | Verificar existencia CF                 | `getNodeContent` con `depth: 1`                                              |

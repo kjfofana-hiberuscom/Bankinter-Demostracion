@@ -80,6 +80,7 @@ Espera su ACK. Cuando llegue, actualiza STATUS con el resultado.
 ### Paso 3 — Cierre
 
 Actualiza STATUS a `COMPLETED`, `FAILED` o `PARTIAL` y presenta el resumen final al usuario incluyendo:
+
 - Título del contenido extraído
 - Ruta del CF creado en AEM (`/content/dam/...`)
 - URL de origen
@@ -91,27 +92,27 @@ Actualiza STATUS a `COMPLETED`, `FAILED` o `PARTIAL` y presenta el resumen final
 ACK format esperado:
 `cf-scraper | {STATUS} | title:{nombre} | json_path:{path} | questions:{N} | failure_class:{CLASS}`
 
-| Condición                            | Acción                                                                           |
-| ------------------------------------ | -------------------------------------------------------------------------------- |
-| `COMPLETE`                           | Avanza al Paso 2 con `json_path` del ACK.                                        |
-| `FAIL` · `failure_class:NETWORK`     | Reporta al usuario: error de red o timeout. Detente.                             |
-| `FAIL` · `failure_class:AUTH`        | Reporta al usuario: la página requiere autenticación. Detente.                   |
-| `FAIL` · `failure_class:PLAYWRIGHT`  | Reporta al usuario: fallo de browser. Sugiere `npx playwright install chromium`. |
-| `FAIL` · `failure_class:PARSE`       | Reporta al usuario: la página cargó pero no se pudo identificar la estructura.   |
-| `questions:>0`                       | Bloquea el pipeline. Presenta la pregunta al usuario. Relanza con la respuesta.  |
+| Condición                           | Acción                                                                           |
+| ----------------------------------- | -------------------------------------------------------------------------------- |
+| `COMPLETE`                          | Avanza al Paso 2 con `json_path` del ACK.                                        |
+| `FAIL` · `failure_class:NETWORK`    | Reporta al usuario: error de red o timeout. Detente.                             |
+| `FAIL` · `failure_class:AUTH`       | Reporta al usuario: la página requiere autenticación. Detente.                   |
+| `FAIL` · `failure_class:PLAYWRIGHT` | Reporta al usuario: fallo de browser. Sugiere `npx playwright install chromium`. |
+| `FAIL` · `failure_class:PARSE`      | Reporta al usuario: la página cargó pero no se pudo identificar la estructura.   |
+| `questions:>0`                      | Bloquea el pipeline. Presenta la pregunta al usuario. Relanza con la respuesta.  |
 
 ## Routing ACK — cf-contributor
 
 ACK format esperado:
 `cf-contributor | {STATUS} | title:{nombre} | cf_path:{path} | questions:{N} | failure_class:{CLASS}`
 
-| Condición                               | Acción                                                                                           |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `COMPLETE`                              | Cierra pipeline con éxito. Informa ruta CF y título.                                             |
-| `FAIL` · `failure_class:AEM_DOWN`       | Reporta: AEM no responde. El usuario debe verificar AEM en `http://localhost:4502`.              |
-| `FAIL` · `failure_class:INVALID_JSON`   | Reporta: el JSON extraído no tiene los campos mínimos. Revisa la URL proporcionada.              |
-| `FAIL` · `failure_class:ALREADY_EXISTS` | Reporta: ya existe un CF para esa URL. Pregunta al usuario si desea sobreescribirlo.             |
-| `questions:>0`                          | Bloquea el pipeline. Presenta la pregunta al usuario. Relanza con la respuesta.                  |
+| Condición                               | Acción                                                                               |
+| --------------------------------------- | ------------------------------------------------------------------------------------ |
+| `COMPLETE`                              | Cierra pipeline con éxito. Informa ruta CF y título.                                 |
+| `FAIL` · `failure_class:AEM_DOWN`       | Reporta: AEM no responde. El usuario debe verificar AEM en `http://localhost:4502`.  |
+| `FAIL` · `failure_class:INVALID_JSON`   | Reporta: el JSON extraído no tiene los campos mínimos. Revisa la URL proporcionada.  |
+| `FAIL` · `failure_class:ALREADY_EXISTS` | Reporta: ya existe un CF para esa URL. Pregunta al usuario si desea sobreescribirlo. |
+| `questions:>0`                          | Bloquea el pipeline. Presenta la pregunta al usuario. Relanza con la respuesta.      |
 
 ---
 

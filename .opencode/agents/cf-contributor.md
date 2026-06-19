@@ -108,13 +108,37 @@ Si el MCP responde con error de conexión → ACK `FAIL | failure_class:AEM_DOWN
 
 Si el JSON no incluye `aem.model_fields` → salta este paso (el modelo ya existe en AEM).
 
-### 3. Crear la carpeta DAM
+### 3. Crear la jerarquía de carpetas DAM y configurar política CF
+
+**a) Crear las carpetas (la ruta completa de una vez):**
 
 Llama a `createDamFolder` con:
 
 - `folderPath`: `aem.parent_path`
 
-Si la carpeta ya existe → continúa sin fallo.
+`createDamFolder` hace mkdir -p — crea toda la jerarquía incluyendo `/content/dam/{domain}` y `/content/dam/{domain}/{content_type}` en una sola llamada. Si alguna carpeta ya existe, continúa sin fallo.
+
+Si el MCP responde con error de conexión → ACK `FAIL | failure_class:AEM_DOWN`
+
+**b) Configurar "Allowed Content Fragment Models" en la carpeta raíz del dominio:**
+
+Deriva la carpeta raíz del dominio a partir de `aem.parent_path`:
+
+- Separa el path por `/` y toma los 3 primeros segmentos no vacíos: `content`, `dam`, `{domain}`
+- `domain_root` = `/content/dam/{domain}` (ej: `/content/dam/bankinter.com`)
+
+Deriva el `configPath` a partir de `aem.model_path`:
+
+- Toma todo lo que hay antes de `/settings` (ej: `/conf/global`)
+
+Llama a `setDamFolderCfPolicy` con:
+
+- `folderPath`: `{domain_root}` ← raíz del dominio, NO la subcarpeta
+- `allowedByPath`: `["{configPath}"]` ← ej: `["/conf/global"]`
+- `mode`: `"merge"` ← no sobreescribe políticas existentes
+
+Esta política permite todos los modelos CF del conf en la carpeta del dominio y en **todas sus subcarpetas automáticamente por herencia**.
+
 Si el MCP responde con error de conexión → ACK `FAIL | failure_class:AEM_DOWN`
 
 ### 4. Crear el Content Fragment

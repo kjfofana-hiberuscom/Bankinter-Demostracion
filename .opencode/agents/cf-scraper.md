@@ -125,6 +125,7 @@ Analiza los segmentos del path para obtener un identificador que represente la c
 3. Normaliza a kebab-case en minúsculas (espacios y caracteres especiales → guión).
 
 Ejemplos:
+
 - `/blog/diccionario-economia/preferente` → `diccionario-economia`
 - `/productos/hipotecas/fija` → `hipotecas`
 - `/about/team/john-doe` → `team`
@@ -137,6 +138,7 @@ Si el path tiene un solo segmento o todos los segmentos son genéricos → `cont
 Partiendo del contenido extraído, define los campos del modelo:
 
 - **Siempre incluye** como mínimo:
+
   ```json
   { "name": "titulo",    "label": "Título",    "type": "text-single", "required": true  },
   { "name": "contenido", "label": "Contenido", "type": "text-multi",  "required": true  },
@@ -151,7 +153,12 @@ Partiendo del contenido extraído, define los campos del modelo:
 
 - **Si hay links relacionados** (array no vacío), añade:
   ```json
-  { "name": "relacionados", "label": "Contenido relacionado", "type": "text-multi", "required": false }
+  {
+    "name": "relacionados",
+    "label": "Contenido relacionado",
+    "type": "text-multi",
+    "required": false
+  }
   ```
 
 **c) Construir la sección `aem`**
@@ -172,9 +179,9 @@ Partiendo del contenido extraído, define los campos del modelo:
 
 ```json
 {
-  "titulo":    "{título extraído}",
+  "titulo": "{título extraído}",
   "contenido": "{párrafos del cuerpo principal concatenados con doble newline}",
-  "url_origen":"{URL}",
+  "url_origen": "{URL}",
   "{name_campo_etiquetado_1}": "{valor_1}",
   "{name_campo_etiquetado_2}": "{valor_2}",
   "relacionados": "{lista: texto | url, uno por línea}"
@@ -226,10 +233,10 @@ Retorna exactamente este formato (una línea):
 cf-scraper | {STATUS} | title:{cf_title} | json_path:context/cf/{domain}/{page_slug}.json | questions:0 | failure_class:{CLASS}
 ```
 
-| STATUS     | Cuándo                                                              |
-| ---------- | ------------------------------------------------------------------- |
-| `COMPLETE` | playwright-cli ejecutó y se extrajo título + contenido principal    |
-| `FAIL`     | Error de red, auth, playwright o estructura no identificada         |
+| STATUS     | Cuándo                                                           |
+| ---------- | ---------------------------------------------------------------- |
+| `COMPLETE` | playwright-cli ejecutó y se extrajo título + contenido principal |
+| `FAIL`     | Error de red, auth, playwright o estructura no identificada      |
 
 **failure_class** (solo en FAIL):
 
