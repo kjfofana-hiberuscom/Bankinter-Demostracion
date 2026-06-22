@@ -71,16 +71,31 @@ Lee el fichero en `json_path`. Verifica que existen: `domain`, `content_type`, `
 
 Si falta alguno → ACK `FAIL | failure_class:INVALID_JSON`
 
-**Deriva las rutas AEM** a partir de los campos semánticos del JSON:
+**Descubre el `conf_root` real** llamando al MCP:
 
 ```
-conf_root   = "/conf/global"   ← convención del proyecto
+getNodeContent(path: "/conf", depth: 1)
+```
+
+Inspecciona los nodos hijo de `/conf`. Busca uno cuyo nombre coincida con el dominio del JSON:
+
+1. Coincidencia exacta: `/conf/{domain}` (ej: `/conf/bankinter.com`)
+2. Sin TLD: `/conf/{domain sin última extensión}` (ej: `/conf/bankinter`)
+3. Si ninguno coincide → usa `/conf/global` como fallback
+
+Ejemplos para `domain: "bankinter.com"`:
+
+- Hay nodo `bankinter.com` → `conf_root = /conf/bankinter.com` ✓
+- Hay nodo `bankinter` → `conf_root = /conf/bankinter` ✓
+- Solo hay `global` y `dam` → `conf_root = /conf/global` (fallback)
+
+**Deriva el resto de rutas AEM:**
+
+```
 model_path  = "{conf_root}/settings/dam/cfm/models/{content_type}"
 parent_path = "/content/dam/{domain}/{content_type}"
 domain_root = "/content/dam/{domain}"
 ```
-
-Estas convenciones son la fuente de verdad de este proyecto para las rutas AEM. Si el proyecto cambia de conf, se actualiza aquí, no en el scraper.
 
 Extrae además del JSON:
 

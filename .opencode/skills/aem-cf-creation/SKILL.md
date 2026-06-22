@@ -168,11 +168,21 @@ El JSON que llega al contribuidor (producido por `cf-scraper`) tiene esta estruc
 }
 ```
 
-El contribuidor deriva las rutas AEM usando `content_type` y `domain`:
+El contribuidor deriva las rutas AEM usando `content_type` y `domain`. El `conf_root` **se descubre en AEM** — no se hardcodea:
+
+```
+getNodeContent(path: "/conf", depth: 1)
+```
+
+Prioridad para elegir `conf_root`:
+
+1. `/conf/{domain}` — coincidencia exacta (ej: `/conf/bankinter.com`)
+2. `/conf/{domain sin TLD}` — sin extensión (ej: `/conf/bankinter`)
+3. `/conf/global` — fallback si no hay nada específico
 
 | Variable      | Valor derivado                                       |
 | ------------- | ---------------------------------------------------- |
-| `conf_root`   | `/conf/global` (convención del proyecto)             |
+| `conf_root`   | descubierto vía `/conf` (ver arriba)                 |
 | `model_path`  | `{conf_root}/settings/dam/cfm/models/{content_type}` |
 | `parent_path` | `/content/dam/{domain}/{content_type}`               |
 | `domain_root` | `/content/dam/{domain}`                              |
